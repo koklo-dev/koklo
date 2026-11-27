@@ -20,7 +20,7 @@ describe("kokloStrictProfile : liste exacte et snapshot figé (vision §17.1 à 
 
   it("liste exacte des ids, triés, tous préfixés `strict.`", () => {
     expect(kokloStrictProfile.rules.map((r) => r.id)).toEqual(STRICT_IDS);
-    expect(STRICT_IDS).toHaveLength(16);
+    expect(STRICT_IDS).toHaveLength(17);
     expect(STRICT_IDS).toEqual([...STRICT_IDS].sort());
     expect(new Set(STRICT_IDS).size).toBe(STRICT_IDS.length);
     for (const id of STRICT_IDS) expect(id).toMatch(/^strict\.[a-z0-9-]+$/);
@@ -51,7 +51,7 @@ describe("kokloStrictProfile : liste exacte et snapshot figé (vision §17.1 à 
     for (const rule of kokloStrictProfile.rules.filter((r) => r.protected)) {
       expect(rule.severity).toBe("blocking");
     }
-    expect(kokloStrictProfile.rules.filter((r) => r.severity === "blocking").length).toBe(15);
+    expect(kokloStrictProfile.rules.filter((r) => r.severity === "blocking").length).toBe(16);
   });
 
   it("les verrous du profil (D3) : exactement les 8 règles protégées", () => {

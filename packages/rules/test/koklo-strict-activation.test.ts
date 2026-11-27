@@ -22,12 +22,12 @@ import {
 const strictIn = (ids: readonly string[]) => ids.filter((id) => id.startsWith("strict."));
 
 describe("withKokloStrict : catalogue koklo = catalogue Shipyard + profil", () => {
-  it("ajoute le profil `koklo-strict` (kind standard) et les 16 règles", () => {
+  it("ajoute le profil `koklo-strict` (kind standard) et les 17 règles", () => {
     const c = strictCatalog();
     expect(c.profiles[KOKLO_STRICT_PROFILE_ID]).toEqual(kokloStrictProfile.profile);
     expect(c.profiles[KOKLO_STRICT_PROFILE_ID]?.kind).toBe("standard");
     expect(strictIn(c.rules.map((r) => r.id))).toEqual(STRICT_IDS);
-    expect(c.rules).toHaveLength(loadBuiltInCatalog().rules.length + 16);
+    expect(c.rules).toHaveLength(loadBuiltInCatalog().rules.length + 17);
   });
 
   it("verrouille les 8 règles D3 en plus des 4 protégées de Shipyard", () => {
@@ -131,7 +131,7 @@ describe("profil `standard` : sélection racine, paquet et catalogue", () => {
   });
 
   it.each(["developer", "qa-reviewer", "tech-lead"] as const)(
-    "profil activé : les 16 règles sont effectives pour %s",
+    "profil activé : les 17 règles sont effectives pour %s",
     (role) => {
       const r = resolveStrict({ layers: [activated], role });
       expect(strictIn(ruleIds(r))).toEqual(STRICT_IDS);

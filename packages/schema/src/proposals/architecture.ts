@@ -109,8 +109,10 @@ export const adrProposalSchema = z
   })
   .strict();
 
+/** `specId` : posé par le code seul quand le brouillon remplit une section existante vide (TK-115, B723). */
 export const docSectionProposalSchema = z
   .object({
+    specId: link(/^DOC-[a-z0-9][a-z0-9-]*$/).optional(),
     title: oneLine(200),
     markdown: safeText({ min: 1, max: 8000, multiline: true }),
   })

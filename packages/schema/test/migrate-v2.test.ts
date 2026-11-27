@@ -133,6 +133,34 @@ describe("cas 8 : migration pure v1 vers v2", () => {
     expect(written.get("api/endpoints/auth.creer-2.yaml")).toContain("id: auth.creer-2");
   });
 
+  it("TK-115 : l'identifiant d'une opération du cahier technique est pris, son fichier n'est pas écrasé", () => {
+    const operation = [
+      "id: auth.creer",
+      "type: ecriture",
+      "zone: Comptes",
+      "composant: C-api",
+      "permission: public",
+      "resume: Crée un compte.",
+      "",
+    ].join("\n");
+    const component = [
+      "id: C-api",
+      "nom: API",
+      "type: service",
+      "zone: Noyau",
+      "responsabilite: Répond.",
+      "",
+    ].join("\n");
+    const { written } = applied(
+      v1({
+        "api/endpoints/auth.creer.yaml": operation,
+        "architecture/components/api.yaml": component,
+      }),
+    );
+    expect(written.has("api/endpoints/auth.creer.yaml")).toBe(false);
+    expect(written.get("api/endpoints/auth.creer-2.yaml")).toContain("methode: POST");
+  });
+
   it("GET sans accolade : lister, avec accolade : lire ; segment à accolades ignoré", () => {
     const get = (id: string, chemin: string) =>
       `id: ${id}\nmethode: GET\nchemin: ${chemin}\ntables: [T-user]\n`;

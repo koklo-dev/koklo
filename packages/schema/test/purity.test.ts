@@ -28,7 +28,8 @@ const FORBIDDEN: [string, RegExp][] = [
   ["process", /\bprocess\b/],
   ["Date", /\bDate\b/],
   ["Math.random", /\bMath\s*\.\s*random\b/],
-  ["performance", /\bperformance\b/],
+  // Usage de l'API seul : « performance » est aussi une catégorie d'exigence (TK-115).
+  ["performance", /\bperformance\s*(?:\??\.|\[)/],
   ["crypto.random*", /\bcrypto\b/],
   ["console", /\bconsole\b/],
 ];

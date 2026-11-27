@@ -40,9 +40,9 @@ const withoutReviewKinds = (enums: string[]) =>
       entry.startsWith("counter_name:") ? "counter_name:ticket,sprint,feature,suggestion" : entry,
     )
     .map((entry) =>
-      // TK-109 et TK-113 : les valeurs `table`, `component`, `adr` et `archflow` de `comment_target_kind` sont postérieures.
+      // TK-109, TK-113 et TK-115 : les cibles ajoutées à `comment_target_kind` (de `table` à `tech_section`) sont postérieures.
       entry.startsWith("comment_target_kind:")
-        ? entry.replace(/,table,component,adr,archflow$/, ",table").replace(/,table$/, "")
+        ? entry.replace(/,table(,component,adr,archflow,stack,environments,tech_section)?$/, "")
         : entry,
     )
     .map((entry) =>

@@ -42,6 +42,11 @@ export const AGENT_PROPOSAL_KINDS = [
   "archflow",
   "adr",
   "doc_section",
+  /** Technique (TK-115) : choix de la stack, opération de l'API, exigence et environnement. */
+  "stack",
+  "op",
+  "nfr",
+  "env",
 ] as const;
 export type AgentProposalKind = (typeof AGENT_PROPOSAL_KINDS)[number];
 
@@ -96,6 +101,17 @@ export const AGENT_READS = {
     "data.tables",
     "architecture.current",
     "nfr.known",
+  ],
+  /** Technique (TK-115) : le Fonctionnel, les tables, l'architecture, les exigences connues et le cahier technique actuel. */
+  technical: [
+    "functional.features",
+    "functional.rules",
+    "functional.roles",
+    "functional.flows",
+    "data.tables",
+    "architecture.current",
+    "nfr.known",
+    "technical.current",
   ],
 } as const;
 

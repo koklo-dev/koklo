@@ -87,6 +87,19 @@ describe("TK-111 dossiers de l'architecture", () => {
   });
 });
 
+describe("TK-115 dossier des choix techniques", () => {
+  it("tech/stack vide gardé par un .gitkeep ; la section 01 du cahier est inchangée", () => {
+    const written = files();
+    const paths = written.map((file) => file.path);
+    expect(paths).toContain("tech/stack/.gitkeep");
+    expect(paths.filter((path) => /^tech\/stack\/(?!\.gitkeep$)/.test(path))).toEqual([]);
+    expect(paths).not.toContain("tech/environments.yaml");
+    expect(written.find((file) => file.path === "tech/cahier-technique/01-objet.md")?.content).toBe(
+      "# Cahier technique : objet\n\nÀ compléter pendant le cadrage : pile retenue, contraintes, environnements.\n",
+    );
+  });
+});
+
 describe("TK-93 noms de dépôt", () => {
   it("par défaut : <slug du projet>-spec ; le slug est borné pour laisser place au suffixe", () => {
     expect(specRepoName("Refonte du Portail", undefined)).toBe("refonte-du-portail-spec");

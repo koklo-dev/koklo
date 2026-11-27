@@ -191,6 +191,19 @@
     }
   },
   {
+    "id": "strict.no-secret-in-spec",
+    "severity": "blocking",
+    "protected": false,
+    "agents": [
+      "developer",
+      "qa-reviewer",
+      "tech-lead"
+    ],
+    "enforcement": {
+      "kind": "instruction"
+    }
+  },
+  {
     "id": "strict.structured-logs",
     "severity": "blocking",
     "protected": false,

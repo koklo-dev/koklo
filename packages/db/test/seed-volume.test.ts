@@ -324,7 +324,11 @@ describe("TK-101 seed:large et seed:planche : index d'entités (spec_entities, e
 
     const counts = Object.fromEntries((await entityCounts(id)).map((row) => [row.kind, row.n]));
     expect(counts).toEqual({
-      endpoint: SEED_VOLUMES.large.endpoints,
+      // TK-115 : les opérations du cahier technique rejoignent les endpoints REST de l'index.
+      endpoint: SEED_VOLUMES.large.endpoints + SEED_VOLUMES.large.operations,
+      stack: SEED_VOLUMES.large.stacks,
+      nfr: SEED_VOLUMES.large.nfrs,
+      environments: 1,
       feature: 1000,
       fixture: 2,
       flow: 18,
@@ -451,7 +455,7 @@ describe("TK-101 seed:large et seed:planche : index d'entités (spec_entities, e
       feature: 248,
       table: 65,
       fixture: 2,
-      endpoint: 47,
+      endpoint: 47 + 132,
       rule: 86,
       flow: 18,
     });
@@ -671,4 +675,104 @@ describe("TK-111 composants et propositions d'architecture", () => {
       ),
     ).toHaveLength(1);
   }, 120_000);
+});
+
+/**
+ * TK-115 (cas 9, B736) : cahier technique des jeux de volume, aux formes de l'index du worker. `planche` : 24 choix dont 2 à
+ * trancher, 132 opérations, 28 exigences, 3 environnements ; `large` : 300, 500, 200 et 3. Aucune proposition semée.
+ */
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: suite de cas d'une même procédure, un test par comportement
+describe("TK-115 jeux de volume du cahier technique", () => {
+  type Row = { spec_id: string; path: string; sort: number; data: Record<string, unknown> };
+  const rowsOf = async (project: string, kind: string) => {
+    const id = (await projectByName(project))?.id as string;
+    return db.query<Row>(
+      `SELECT e.spec_id, e.path, e.sort, e.data FROM spec_entities e
+         JOIN spec_snapshots s ON s.id = e.snapshot_id JOIN project_repos r ON r.id = s.repo_id
+        WHERE r.project_id = $1 AND e.kind = $2 ORDER BY e.sort, e.id`,
+      [id, kind],
+    );
+  };
+  const LAYERS = ["applications", "services", "donnees", "externes", "exploitation"];
+
+  async function checkTechnical(project: string, profile: "planche" | "large") {
+    const volume = SEED_VOLUMES[profile];
+    const stacks = await rowsOf(project, "stack");
+    expect(stacks).toHaveLength(volume.stacks);
+    const ranks = stacks.map((row) => LAYERS.indexOf(String(row.data.couche)));
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
+    for (const row of stacks) {
+      const data = row.data as {
+        id: string;
+        titre: string;
+        role: string;
+        statut: string;
+        choix?: string;
+        options: string[];
+        criteres: { valeurs: string[] }[];
+      };
+      expect(data.id).toBe(row.spec_id);
+      expect(row.path).toBe(`tech/stack/${row.spec_id.slice(3)}.yaml`);
+      expect(data.titre).toBe(`${data.role} : ${data.choix ?? "à trancher"}`);
+      expect(data.statut === "choisi").toBe(data.choix !== undefined);
+      expect(data.options.length).toBeGreaterThanOrEqual(2);
+      expect(data.criteres.every((c) => c.valeurs.length === data.options.length)).toBe(true);
+    }
+    // Les endpoints REST du jeu (`E-…`) partagent le genre `endpoint`.
+    const operations = (await rowsOf(project, "endpoint")).filter(
+      (row) => !row.spec_id.startsWith("E-"),
+    );
+    expect(operations).toHaveLength(volume.operations);
+    for (const row of operations) {
+      expect(row.spec_id).toMatch(/^[a-z_0-9]+\.[a-z]+$/);
+      expect(row.path).toBe(`api/endpoints/${row.spec_id}.yaml`);
+      expect(row.data).toMatchObject({ id: row.spec_id, titre: row.data.resume });
+    }
+    const requirements = await rowsOf(project, "nfr");
+    expect(requirements).toHaveLength(volume.nfrs);
+    expect(requirements[0]?.path).toBe("nfr/NFR-001.yaml");
+    const [file] = await rowsOf(project, "environments");
+    expect(file).toMatchObject({ spec_id: "environments", path: "tech/environments.yaml" });
+    expect(file?.data.environnements).toHaveLength(volume.environments);
+    expect(JSON.stringify(file?.data.variables)).not.toContain("valeur");
+    const id = (await projectByName(project))?.id as string;
+    const [counter] = await db.query<{ last_value: number }>(
+      "SELECT last_value FROM project_counters WHERE project_id = $1 AND name = 'nfr'",
+      [id],
+    );
+    expect(counter?.last_value).toBe(volume.nfrs);
+    const [proposals] = await db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM agent_proposals WHERE project_id = $1 AND deliverable = 'technical'`,
+      [id],
+    );
+    expect(proposals?.n).toBe(0);
+    return stacks;
+  }
+
+  it("planche : 24 choix (ST-sms et le paiement à trancher), 132 opérations, 28 exigences, 3 environnements", async () => {
+    await seedPlanche(db.url);
+    await seedPlanche(db.url);
+    expect(SEED_VOLUMES.planche).toMatchObject({
+      stacks: 24,
+      operations: 132,
+      nfrs: 28,
+      environments: 3,
+    });
+    const stacks = await checkTechnical("Volume · planche", "planche");
+    const open = stacks.filter((row) => row.data.statut === "a_trancher").map((r) => r.spec_id);
+    expect(open.sort()).toEqual(["ST-013", "ST-sms"]);
+  }, 240_000);
+
+  it("large : 300 choix, 500 opérations, 200 exigences ; un choix retrouvable en 5e page", async () => {
+    await seedLarge(db.url);
+    expect(SEED_VOLUMES.large).toMatchObject({
+      stacks: 300,
+      operations: 500,
+      nfrs: 200,
+      environments: 3,
+    });
+    const stacks = await checkTechnical("Volume · charge", "large");
+    const position = stacks.findIndex((row) => String(row.data.role).includes("attestations"));
+    expect(Math.floor(position / 24) + 1).toBe(5);
+  }, 240_000);
 });

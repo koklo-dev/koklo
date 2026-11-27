@@ -1,0 +1,152 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/operation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "composant": {
+      "pattern": "^C-[a-z0-9][a-z0-9-]*$",
+      "type": "string"
+    },
+    "entree": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "contrainte": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
+      "default": {},
+      "propertyNames": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_.[\\]]*$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "erreurs": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "quand": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "regle": {
+            "pattern": "^R-\\d{3,}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "quand"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "id": {
+      "pattern": "^[a-z0-9][A-Za-z0-9_-]*\\.[a-z0-9][A-Za-z0-9_-]*$",
+      "type": "string"
+    },
+    "limite": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "permission": {
+      "anyOf": [
+        {
+          "enum": [
+            "public",
+            "interne"
+          ],
+          "type": "string"
+        },
+        {
+          "pattern": "^PM-[a-z0-9][a-z0-9-]*(\\.[a-z0-9][a-z0-9-]*)*$",
+          "type": "string"
+        }
+      ]
+    },
+    "regles": {
+      "default": [],
+      "items": {
+        "pattern": "^R-\\d{3,}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "resume": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "sert": {
+      "default": [],
+      "items": {
+        "pattern": "^F-\\d{3,}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "sortie": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "note": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "type": "object"
+      },
+      "default": {},
+      "propertyNames": {
+        "pattern": "^[A-Za-z][A-Za-z0-9_.[\\]]*$",
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "type": {
+      "enum": [
+        "lecture",
+        "ecriture",
+        "interne"
+      ],
+      "type": "string"
+    },
+    "zone": {
+      "maxLength": 80,
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "type",
+    "zone",
+    "composant",
+    "permission",
+    "resume"
+  ],
+  "type": "object"
+}

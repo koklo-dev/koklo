@@ -16,6 +16,7 @@ const EMPTY_DIRECTORIES = [
   "domain/rules",
   "nfr",
   "api/endpoints",
+  "tech/stack",
   "design/tokens",
   "design/components",
   "design/screens",

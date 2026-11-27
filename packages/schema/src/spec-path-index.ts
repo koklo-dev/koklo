@@ -1,4 +1,5 @@
-import { docSectionSlugOf } from "./doc-section.ts";
+import { type DocSectionDeliverable, docSectionSlugOf } from "./doc-section.ts";
+import { OPERATION_NAME } from "./entities/ids.ts";
 
 /**
  * Index de la tête par chemins (TK-114e, B671) : identifiant -> chemin, par genre, lus dans la liste des fichiers seule (aucun
@@ -13,6 +14,10 @@ const FIXTURE_FILE = /^data\/fixtures\/(FX-[a-z0-9][a-z0-9-]*)\.yaml$/;
 const COMPONENT_FILE = /^architecture\/components\/([a-z0-9][a-z0-9-]*)\.yaml$/;
 const ARCHFLOW_FILE = /^architecture\/flows\/(P-[a-z0-9][a-z0-9-]*)\.yaml$/;
 const ADR_FILE = /^architecture\/adr\/(ADR-\d{3,})-[^/]*\.md$/;
+const STACK_FILE = /^tech\/stack\/([a-z0-9][a-z0-9-]*)\.yaml$/;
+/** Opération `zone.verbe` et ancien REST `E-<slug>` : tous deux occupent leur identifiant. */
+const ENDPOINT_FILE = new RegExp(`^api/endpoints/(E-[a-z0-9][a-z0-9-]*|${OPERATION_NAME})\\.yaml$`);
+const NFR_FILE = /^nfr\/(NFR-[a-z0-9][a-z0-9-]*)\.yaml$/;
 
 export interface DocSections {
   /** `DOC-<slug>` -> chemin. */
@@ -38,12 +43,20 @@ export interface SpecPathIndex {
   readonly archflows: Map<string, string>;
   readonly adrs: Map<string, string>;
   readonly docs: DocSections;
+  readonly stacks: Map<string, string>;
+  /** Opérations et endpoints REST. */
+  readonly endpoints: Map<string, string>;
+  readonly nfr: Map<string, string>;
+  /** Sections du cahier technique. */
+  readonly techDocs: DocSections;
 }
 
 /** Ce que l'index lit d'une opération : son genre (préfixe du `kind`) et son identifiant cible. */
 export interface SpecPathOperation {
   readonly kind: string;
   readonly targetSpecId: string | null;
+  /** Lu pour `doc.*` seulement : `deliverable` désigne le dossier des sections (architecture par défaut). */
+  readonly payload?: unknown;
 }
 
 export type SpecConflictReason = "exists" | "missing" | "duplicate";
@@ -74,6 +87,10 @@ export const componentIndex = (paths: Iterable<string>) =>
   mapOf(paths, COMPONENT_FILE, (slug) => `C-${slug}`);
 export const archFlowIndex = (paths: Iterable<string>) => mapOf(paths, ARCHFLOW_FILE);
 export const adrIndex = (paths: Iterable<string>) => mapOf(paths, ADR_FILE);
+export const stackIndex = (paths: Iterable<string>) =>
+  mapOf(paths, STACK_FILE, (slug) => `ST-${slug}`);
+export const endpointIndex = (paths: Iterable<string>) => mapOf(paths, ENDPOINT_FILE);
+export const nfrIndex = (paths: Iterable<string>) => mapOf(paths, NFR_FILE);
 export const fixtureIndex = (paths: Iterable<string>): Set<string> =>
   new Set(mapOf(paths, FIXTURE_FILE).keys());
 
@@ -93,12 +110,15 @@ export function flowIndex(paths: Iterable<string>): FlowIndex {
   return { owned, taken };
 }
 
-/** Sections de la tête : `DOC-<slug>` -> chemin ; le numéro suivant se déduit du plus grand préfixe. */
-export function docSectionIndex(paths: Iterable<string>): DocSections {
+/** Sections d'un livrable à la tête : `DOC-<slug>` -> chemin ; le numéro suivant se déduit du plus grand préfixe. */
+export function docSectionIndex(
+  paths: Iterable<string>,
+  deliverable: DocSectionDeliverable = "architecture",
+): DocSections {
   const byId = new Map<string, string>();
   let last = 0;
   for (const path of paths) {
-    const found = docSectionSlugOf(path);
+    const found = docSectionSlugOf(path, deliverable);
     if (found === undefined) continue;
     byId.set(`DOC-${found.slug}`, path);
     last = Math.max(last, found.num);
@@ -118,11 +138,23 @@ export function specPathIndex(paths: readonly string[]): SpecPathIndex {
     archflows: archFlowIndex(paths),
     adrs: adrIndex(paths),
     docs: docSectionIndex(paths),
+    stacks: stackIndex(paths),
+    endpoints: endpointIndex(paths),
+    nfr: nfrIndex(paths),
+    techDocs: docSectionIndex(paths, "technical"),
   };
 }
 
 /** Genre d'une opération : le préfixe de son `kind` (`feature`, `rule`, `doc`, `layout`, `architecture`…). */
 export const genreOf = (operation: SpecPathOperation): string => operation.kind.split(".")[0] ?? "";
+
+const isTechnicalDoc = (operation: SpecPathOperation): boolean =>
+  genreOf(operation) === "doc" &&
+  (operation.payload as { deliverable?: unknown } | null | undefined)?.deliverable === "technical";
+
+/** Espace d'identifiants d'une opération : une section se cherche dans les sections de son livrable. */
+const scopeOf = (operation: SpecPathOperation): string =>
+  isTechnicalDoc(operation) ? "techDoc" : genreOf(operation);
 
 const PRESENCE: Readonly<Record<string, (index: SpecPathIndex, id: string) => boolean>> = {
   feature: (index, id) => index.features.has(id),
@@ -133,11 +165,16 @@ const PRESENCE: Readonly<Record<string, (index: SpecPathIndex, id: string) => bo
   archflow: (index, id) => index.archflows.has(id),
   adr: (index, id) => index.adrs.has(id),
   doc: (index, id) => index.docs.byId.has(id),
+  techDoc: (index, id) => index.techDocs.byId.has(id),
+  stack: (index, id) => index.stacks.has(id),
+  op: (index, id) => index.endpoints.has(id),
+  nfr: (index, id) => index.nfr.has(id),
 };
 
 /**
  * L'identifiant visé est-il présent sur la tête ? Un parcours créé vise tout identifiant occupé, un parcours modifié un
- * `.yaml`. `undefined` pour un genre que l'index par chemins ne connaît pas (rôle, mise en page) : non vérifié.
+ * `.yaml`. `undefined` pour un genre que l'index par chemins ne connaît pas (rôle, mise en page, environnement) : non
+ * vérifié.
  */
 export function presentAtHead(
   index: SpecPathIndex,
@@ -148,7 +185,7 @@ export function presentAtHead(
   if (genre === "flow") {
     return operation.kind === "flow.create" ? index.flows.taken.has(id) : index.flows.owned.has(id);
   }
-  return PRESENCE[genre]?.(index, id);
+  return PRESENCE[scopeOf(operation)]?.(index, id);
 }
 
 /**
@@ -165,7 +202,7 @@ export function conflictsOf<Operation extends SpecPathOperation>(
     const present = isPresent(operation);
     if (present === undefined) return;
     const creates = operation.kind.endsWith(".create");
-    const key = `${genreOf(operation)}:${operation.targetSpecId ?? ""}`;
+    const key = `${scopeOf(operation)}:${operation.targetSpecId ?? ""}`;
     if (creates === present) {
       conflicts.push({ position, reason: creates ? "exists" : "missing" });
     } else if (creates && created.has(key)) {

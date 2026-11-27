@@ -317,6 +317,9 @@ enum CommentTargetKind {
   component
   adr
   archflow
+  stack
+  environments
+  tech_section
 
   @@map("comment_target_kind")
 }
@@ -346,6 +349,7 @@ enum CounterName {
   suggestion
   rule
   adr
+  nfr
 
   @@map("counter_name")
 }

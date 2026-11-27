@@ -1,0 +1,141 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/environments.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "environnements": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "acces": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "adresse": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "base": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "deploiement": {
+            "enum": [
+              "fusion",
+              "validation",
+              "manuel"
+            ],
+            "type": "string"
+          },
+          "donnees": {
+            "enum": [
+              "jeux_exemple",
+              "copie_anonymisee",
+              "reelles"
+            ],
+            "type": "string"
+          },
+          "hebergement": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^ENV-[a-z0-9][a-z0-9-]*$",
+            "type": "string"
+          },
+          "lignes": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "libelle": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "valeur": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "libelle",
+                "valeur"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nom": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nom",
+          "adresse",
+          "hebergement",
+          "base",
+          "donnees"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "integrations": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "service": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "statut": {
+            "enum": [
+              "a_trancher",
+              "compte_a_creer",
+              "configure",
+              "connecte"
+            ],
+            "type": "string"
+          },
+          "usage": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "service",
+          "usage",
+          "statut"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "variables": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "nom": {
+            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "type": "string"
+          },
+          "usage": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "nom",
+          "usage"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "type": "object"
+}

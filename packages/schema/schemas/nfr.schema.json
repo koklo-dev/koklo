@@ -1,0 +1,73 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/nfr.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "categorie": {
+      "enum": [
+        "donnees",
+        "performance",
+        "securite",
+        "disponibilite",
+        "accessibilite",
+        "exploitation"
+      ],
+      "type": "string"
+    },
+    "cible": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "enonce": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^NFR-[a-z0-9][a-z0-9-]*$",
+      "type": "string"
+    },
+    "liens": {
+      "default": [],
+      "items": {
+        "pattern": "^C-[a-z0-9][a-z0-9-]*$|^ST-[a-z0-9][a-z0-9-]*$|^ADR-\\d{3,}$|^R-\\d{3,}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "titre": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "verification": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "scenario",
+            "mesure_ci",
+            "manuel",
+            "a_definir"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "id",
+    "categorie",
+    "titre",
+    "cible",
+    "enonce",
+    "verification"
+  ],
+  "type": "object"
+}

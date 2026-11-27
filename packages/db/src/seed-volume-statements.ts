@@ -17,6 +17,7 @@ import {
   type VolumeTarget,
 } from "./seed-volume-sql.ts";
 import { fixtureData, tableData } from "./seed-volume-tables.ts";
+import { technicalStatements } from "./seed-volume-technical.ts";
 import { SEED_VOLUMES, type VolumeProfile } from "./seed-volumes.ts";
 
 /**
@@ -431,6 +432,7 @@ export function buildVolumeStatements(
     ...specStatements(profile, target),
     ...entityStatements(profile, target),
     ...domainStatements(profile, target),
+    ...technicalStatements(profile, target),
     ...trackerStatements(profile, target),
     ...proposalStatements(profile, target),
     ...architectureProposalStatements(profile, target),

@@ -106,6 +106,12 @@ const SPECS: readonly Spec[] = [
     { locked: true },
   ],
   [
+    "strict.no-secret-in-spec",
+    "Aucune valeur de secret dans la spec",
+    "La spec ne porte que le nom d'une variable et son usage, jamais sa valeur (passation 12 §4.4).",
+    { kind: "instruction" },
+  ],
+  [
     "strict.structured-logs",
     "Journaux structurés",
     "Les journaux sont des objets structurés, sans donnée personnelle ni secret (vision §17.3).",

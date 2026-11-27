@@ -133,6 +133,13 @@ describe("TK-114g migration motif d'écart : up, down, up", () => {
     }
     const expected = await constraints(baseline);
     const expectedColumns = await columns(baseline);
+    // Défait d'abord les migrations postérieures, de la plus récente à la plus ancienne.
+    for (const later of dirs()
+      .filter((d) => d > named())
+      .reverse()) {
+      runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, later, "down.sql")], db.url);
+      await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [later]);
+    }
     runPrismaOrThrow(["db", "execute", "--file", join(migrationsDir, named(), "down.sql")], db.url);
     await db.query("DELETE FROM _prisma_migrations WHERE migration_name = $1", [named()]);
     expect(await constraints(db)).toEqual(expected);
