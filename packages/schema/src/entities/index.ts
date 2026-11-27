@@ -10,4 +10,5 @@ export * from "./ids.ts";
 export * from "./layout.ts";
 export * from "./project.ts";
 export * from "./screen.ts";
+export * from "./technical.ts";
 export * from "./zones.ts";

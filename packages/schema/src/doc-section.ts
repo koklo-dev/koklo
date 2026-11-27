@@ -4,11 +4,18 @@ import { isOneLine } from "./emit/yaml-inline.ts";
 import { splitFrontMatter } from "./parse/frontmatter.ts";
 
 /**
- * Sections du document d'architecture `architecture/overview/NN-<slug>.md` (TK-111, B508) : jamais indexées en base,
- * lues en Git. Le statut vit dans le front matter (`statut: brouillon | a_relire | validee`) ; un corps vide est
- * « À rédiger », quel que soit le statut déclaré. Fonctions pures, sans I/O ; la lecture ne lève jamais.
+ * Sections d'un document en fichiers `NN-<slug>.md` : architecture (`architecture/overview/`, TK-111, B508) et cahier
+ * technique (`tech/cahier-technique/`, TK-115, B723). Jamais indexées en base, lues en Git. Le statut vit dans le front
+ * matter (`statut: brouillon | a_relire | validee`) ; un corps vide est « À rédiger », quel que soit le statut déclaré.
+ * Fonctions pures, sans I/O ; la lecture ne lève jamais.
  */
-export const DOC_SECTION_DIR = "architecture/overview";
+export const DOC_SECTION_DELIVERABLES = ["architecture", "technical"] as const;
+export type DocSectionDeliverable = (typeof DOC_SECTION_DELIVERABLES)[number];
+export const DOC_SECTION_DIRS: Readonly<Record<DocSectionDeliverable, string>> = {
+  architecture: "architecture/overview",
+  technical: "tech/cahier-technique",
+};
+export const DOC_SECTION_DIR = DOC_SECTION_DIRS.architecture;
 export const DOC_SECTION_STATUSES = ["brouillon", "a_relire", "validee", "a_rediger"] as const;
 export type DocSectionStatus = (typeof DOC_SECTION_STATUSES)[number];
 
@@ -18,7 +25,7 @@ export interface DocSection {
   markdown: string;
 }
 
-const FILE = /^architecture\/overview\/(\d{2,})-([a-z0-9][a-z0-9-]*)\.md$/;
+const FILE_NAME = /^(\d{2,})-([a-z0-9][a-z0-9-]*)\.md$/;
 const STORED = ["brouillon", "a_relire", "validee"] as const;
 
 export class EmitDocSectionError extends EmitError {
@@ -27,12 +34,19 @@ export class EmitDocSectionError extends EmitError {
   }
 }
 
-export const docSectionPath = (num: number, slug: string): string =>
-  `${DOC_SECTION_DIR}/${String(num).padStart(2, "0")}-${slug}.md`;
+export const docSectionPath = (
+  num: number,
+  slug: string,
+  deliverable: DocSectionDeliverable = "architecture",
+): string => `${DOC_SECTION_DIRS[deliverable]}/${String(num).padStart(2, "0")}-${slug}.md`;
 
-/** Numéro d'ordre et slug d'un chemin de section, `undefined` pour tout autre chemin. */
-export function docSectionSlugOf(path: string): { num: number; slug: string } | undefined {
-  const match = FILE.exec(path);
+/** Numéro d'ordre et slug d'un chemin de section du livrable, `undefined` pour tout autre chemin. */
+export function docSectionSlugOf(
+  path: string,
+  deliverable: DocSectionDeliverable = "architecture",
+): { num: number; slug: string } | undefined {
+  const dir = `${DOC_SECTION_DIRS[deliverable]}/`;
+  const match = path.startsWith(dir) ? FILE_NAME.exec(path.slice(dir.length)) : null;
   return match === null ? undefined : { num: Number(match[1]), slug: match[2] as string };
 }
 

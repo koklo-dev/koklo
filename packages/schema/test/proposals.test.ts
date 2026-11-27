@@ -61,6 +61,10 @@ describe("schémas de proposition par type", () => {
       "archflow",
       "adr",
       "doc_section",
+      "stack",
+      "op",
+      "nfr",
+      "env",
     ]);
   });
 

@@ -30,6 +30,8 @@ export type SpecIndex = {
   adrs: Set<string>;
   /** Parcours métier `P-` (`design/flows`) : un flux technique en porte l'identifiant. */
   flows: Set<string>;
+  stacks: Set<string>;
+  nfrs: Set<string>;
 };
 
 export function buildIndex(spec: ParsedSpec): SpecIndex {
@@ -47,7 +49,7 @@ export function buildIndex(spec: ParsedSpec): SpecIndex {
     tables: new Map(
       spec.tables.map((t) => [t.value.id, new Set(t.value.champs.map((c) => c.nom))]),
     ),
-    endpoints: new Set(spec.endpoints.map((e) => e.value.id)),
+    endpoints: new Set([...spec.endpoints, ...spec.operations].map((e) => e.value.id)),
     screens: new Set(spec.screens.map((s) => s.value.id)),
     roles: new Set(spec.roles.flatMap((f) => f.value.roles.map((r) => r.id))),
     permissions: new Set(spec.roles.flatMap((f) => f.value.permissions.map((p) => p.id))),
@@ -55,5 +57,7 @@ export function buildIndex(spec: ParsedSpec): SpecIndex {
     components: new Set(spec.components.map((c) => c.value.id)),
     adrs: new Set(spec.adrs.map((a) => a.value.id)),
     flows: new Set(spec.flows.map((f) => f.value.id)),
+    stacks: new Set(spec.stacks.map((s) => s.value.id)),
+    nfrs: new Set(spec.nfrs.map((n) => n.value.id)),
   };
 }

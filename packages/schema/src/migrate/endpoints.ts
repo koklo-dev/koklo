@@ -36,10 +36,17 @@ export interface EndpointMigration extends MigrationResult {
   readonly ids: Map<string, string>;
 }
 
-/** Réécrit les endpoints `E-<slug>` en `<zone>.<verbe>` ; une collision prend le suffixe `-2`, `-3`, dans l'ordre des anciens identifiants. */
-export function planEndpoints(endpoints: readonly Parsed<Endpoint>[]): EndpointMigration {
+/**
+ * Réécrit les endpoints REST `E-<slug>` en `<zone>.<verbe>` ; une collision prend le suffixe `-2`, `-3`, dans l'ordre des
+ * anciens identifiants. `reserved` : identifiants des opérations du cahier technique, jamais écrasées ni converties.
+ */
+export function planEndpoints(
+  endpoints: readonly Parsed<Endpoint>[],
+  reserved: readonly string[],
+): EndpointMigration {
   const ids = new Map<string, string>();
-  const taken = new Set(endpoints.map((e) => e.value.id).filter((id) => !id.startsWith("E-")));
+  const current = endpoints.map((e) => e.value.id).filter((id) => !id.startsWith("E-"));
+  const taken = new Set([...current, ...reserved]);
   const result: EndpointMigration = { changes: [], issues: [], ids };
   const legacy = endpoints
     .filter((e) => e.value.id.startsWith("E-"))

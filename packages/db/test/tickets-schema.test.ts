@@ -144,11 +144,27 @@ describe("TK-28 C7 parité des valeurs fermées avec @koklo/domain", () => {
     [
       "ticket_comments",
       "target_kind",
-      ["ticket", "feature", "screen", "change_request", "table", "component", "adr", "archflow"],
+      [
+        "ticket",
+        "feature",
+        "screen",
+        "change_request",
+        "table",
+        "component",
+        "adr",
+        "archflow",
+        "stack",
+        "environments",
+        "tech_section",
+      ],
     ],
     ["ticket_comments", "author_kind", ["human", "agent", "client", "system"]],
     ["audit_log", "actor_kind", ["human", "agent", "runner", "system"]],
-    ["project_counters", "name", ["ticket", "sprint", "feature", "suggestion", "rule", "adr"]],
+    [
+      "project_counters",
+      "name",
+      ["ticket", "sprint", "feature", "suggestion", "rule", "adr", "nfr"],
+    ],
   ];
 
   it.each(closedLists)("%s.%s = valeurs exactes attendues", async (table, column, expected) => {

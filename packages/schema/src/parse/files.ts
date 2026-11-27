@@ -1,4 +1,4 @@
-import type { RolesFile } from "../entities/index.ts";
+import { isRestEndpoint, type RolesFile } from "../entities/index.ts";
 import { compare, sortIssues, structIssue } from "../issue.ts";
 import type { Issue, Parsed, ParsedSpec, SpecFile } from "../types.ts";
 import { parseAdrMarkdown } from "./adr-markdown.ts";
@@ -53,7 +53,8 @@ function parseData(file: SpecFile, kind: Kind, version: SpecVersion): FileResult
       ? applyZoneAlias(file.path, loaded.data, id)
       : { ok: true as const, data: loaded.data };
   if (!aliased.ok) return aliased;
-  const result = parseWithSchema(schemaFor(kind, version), file.path, aliased.data, id);
+  const schema = schemaFor(kind, version, aliased.data);
+  const result = parseWithSchema(schema, file.path, aliased.data, id);
   if (!result.ok) return result;
   const duplicates =
     kind === "roles" ? duplicateIdIssues(file.path, result.value as RolesFile) : [];
@@ -110,6 +111,8 @@ const IDENTIFIED = new Set<Kind>([
   "component",
   "archflow",
   "adr",
+  "stack",
+  "nfr",
 ]);
 
 const empty = (): ParsedSpec => ({
@@ -126,6 +129,10 @@ const empty = (): ParsedSpec => ({
   components: [],
   archFlows: [],
   adrs: [],
+  stacks: [],
+  operations: [],
+  nfrs: [],
+  environments: [],
 });
 
 /** Liste du snapshot qui reçoit chaque genre d'entité (`project` est un champ à part). */
@@ -143,12 +150,16 @@ const LIST_OF = {
   component: "components",
   archflow: "archFlows",
   adr: "adrs",
+  stack: "stacks",
+  nfr: "nfrs",
+  environments: "environments",
 } as const satisfies Record<Exclude<Kind, "project">, keyof ParsedSpec>;
 
 /** Range une entité valide dans la bonne liste du snapshot. */
 function place(spec: ParsedSpec, kind: Kind, path: string, value: unknown): void {
   const entry = { path, value } as Parsed<never>;
   if (kind === "project") spec.project = entry;
+  else if (kind === "endpoint" && !isRestEndpoint(value)) spec.operations.push(entry);
   else spec[LIST_OF[kind]].push(entry);
 }
 

@@ -1,0 +1,134 @@
+{
+  "$id": "https://koklo.dev/schemas/spec/v1/stack.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "choix": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "composants": {
+      "default": [],
+      "items": {
+        "pattern": "^C-[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "couche": {
+      "enum": [
+        "applications",
+        "services",
+        "donnees",
+        "externes",
+        "exploitation"
+      ],
+      "type": "string"
+    },
+    "criteres": {
+      "default": [],
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "estimation": {
+            "type": "boolean"
+          },
+          "nom": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "valeurs": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "nom",
+          "valeurs"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "decisions": {
+      "default": [],
+      "items": {
+        "pattern": "^ADR-\\d{3,}$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "en_clair": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "exigences": {
+      "default": [],
+      "items": {
+        "pattern": "^NFR-[a-z0-9][a-z0-9-]*$",
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "icone": {
+      "enum": [
+        "web",
+        "hub",
+        "key",
+        "database",
+        "queue",
+        "sms",
+        "mail",
+        "cloud",
+        "monitoring",
+        "rocket_launch",
+        "search",
+        "payments"
+      ],
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^ST-[a-z0-9][a-z0-9-]*$",
+      "type": "string"
+    },
+    "options": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 2,
+      "type": "array"
+    },
+    "pourquoi": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "recommande": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "role": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "statut": {
+      "enum": [
+        "choisi",
+        "a_trancher"
+      ],
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "couche",
+    "role",
+    "statut",
+    "options",
+    "pourquoi"
+  ],
+  "type": "object"
+}

@@ -15,9 +15,10 @@ import { createTestDatabase, type TestDatabase } from "../src/testing/test-datab
  * Additive ; `down.sql` recrée l'enum sans `rule` (PostgreSQL ne retire pas une valeur), `migrate diff` vide.
  */
 const SUFFIX = "_rule_counter";
-const migration = () => listMigrationDirs().find((dir) => dir.endsWith(SUFFIX)) as string;
-const sqlOf = (file: "migration.sql" | "down.sql") =>
-  readFileSync(join(migrationsDir, migration(), file), "utf8");
+const migration = (suffix = SUFFIX) =>
+  listMigrationDirs().find((dir) => dir.endsWith(suffix)) as string;
+const sqlOf = (file: "migration.sql" | "down.sql", suffix = SUFFIX) =>
+  readFileSync(join(migrationsDir, migration(suffix), file), "utf8");
 
 let db: TestDatabase;
 beforeAll(async () => {
@@ -52,6 +53,8 @@ describe("TK-103 migration rule_counter", () => {
   }, 180_000);
 
   it("down.sql retire rule sans toucher aux autres compteurs, et rejoue (up, down, up)", async () => {
+    // La migration postérieure du même enum (`nfr`, TK-115) se défait d'abord.
+    await db.query(sqlOf("down.sql", "_nfr_counter"));
     expect(await labels()).toEqual(["ticket", "sprint", "feature", "suggestion", "rule", "adr"]);
     await db.query(sqlOf("down.sql"));
     expect(await labels()).toEqual(["ticket", "sprint", "feature", "suggestion"]);

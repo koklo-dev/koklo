@@ -4,13 +4,17 @@ import type {
   BusinessRule,
   Component,
   Endpoint,
+  EnvironmentsFile,
   Feature,
   Fixture,
   Flow,
+  Nfr,
+  Operation,
   ProjectManifest,
   RelationsFile,
   RolesFile,
   Screen,
+  Stack,
   Table,
   TestScenario,
 } from "./entities/index.ts";
@@ -41,6 +45,7 @@ export type ParsedSpec = {
   features: Parsed<Feature>[];
   tables: Parsed<Table>[];
   relations: Parsed<RelationsFile>[];
+  /** Endpoints au format REST seuls ; les opérations du cahier technique sont dans `operations`. */
   endpoints: Parsed<Endpoint>[];
   screens: Parsed<Screen>[];
   tests: Parsed<TestScenario>[];
@@ -51,4 +56,8 @@ export type ParsedSpec = {
   components: Parsed<Component>[];
   archFlows: Parsed<ArchFlow>[];
   adrs: Parsed<Adr>[];
+  stacks: Parsed<Stack>[];
+  operations: Parsed<Operation>[];
+  nfrs: Parsed<Nfr>[];
+  environments: Parsed<EnvironmentsFile>[];
 };

@@ -26,6 +26,13 @@ const PATHS = [
   "architecture/adr/ADR-001-postgres.md",
   "architecture/overview/03-taches-modeles-de-taches-et-cycle-de-vie.md",
   "architecture/overview/01-contexte.md",
+  "tech/stack/sms.yaml",
+  "api/endpoints/creneau.listAvailable.yaml",
+  "api/endpoints/E-auth.yaml",
+  "nfr/NFR-001.yaml",
+  "nfr/notes.md",
+  "tech/cahier-technique/01-objet.md",
+  "tech/cahier-technique/04-securite.md",
   "README.md",
 ];
 
@@ -63,6 +70,52 @@ describe("specPathIndex (TK-114e)", () => {
     expect(presentAtHead(index, op("role.create", "RL-client"))).toBeUndefined();
     expect(presentAtHead(index, op("layout.save", null))).toBeUndefined();
     expect(presentAtHead(index, op("architecture.layout.save", null))).toBeUndefined();
+  });
+});
+
+describe("cahier technique (TK-115)", () => {
+  const index = specPathIndex(PATHS);
+
+  it("indexe les choix, les opérations (REST compris), les exigences et les sections du cahier", () => {
+    expect(index.stacks.get("ST-sms")).toBe("tech/stack/sms.yaml");
+    expect([...index.endpoints.keys()].sort()).toEqual(["E-auth", "creneau.listAvailable"]);
+    expect([...index.nfr.keys()]).toEqual(["NFR-001"]);
+    expect([...index.techDocs.byId.keys()]).toEqual(["DOC-objet", "DOC-securite"]);
+    expect(index.techDocs.last).toBe(4);
+    expect(index.docs.byId.has("DOC-objet")).toBe(false);
+    expect(docSectionIndex(PATHS, "technical").last).toBe(4);
+  });
+
+  it("presentAtHead : stack, op et nfr vérifiés ; les environnements ne le sont pas", () => {
+    expect(presentAtHead(index, op("stack.update", "ST-sms"))).toBe(true);
+    expect(presentAtHead(index, op("stack.create", "ST-zzz"))).toBe(false);
+    expect(presentAtHead(index, op("op.update", "creneau.listAvailable"))).toBe(true);
+    expect(presentAtHead(index, op("op.create", "avis.create"))).toBe(false);
+    expect(presentAtHead(index, op("nfr.delete", "NFR-001"))).toBe(true);
+    expect(presentAtHead(index, op("env.create", "ENV-recette"))).toBeUndefined();
+  });
+
+  it("une section se cherche dans le dossier de son livrable (architecture par défaut)", () => {
+    const section = (deliverable?: string): SpecPathOperation => ({
+      ...op("doc.section.update", "DOC-objet"),
+      payload: deliverable === undefined ? {} : { deliverable },
+    });
+    expect(presentAtHead(index, section("technical"))).toBe(true);
+    expect(presentAtHead(index, section("architecture"))).toBe(false);
+    expect(presentAtHead(index, section())).toBe(false);
+    expect(presentAtHead(index, op("doc.section.update", "DOC-contexte"))).toBe(true);
+  });
+
+  it("conflit : même section créée dans deux livrables n'est pas un doublon", () => {
+    const create = (deliverable: string): SpecPathOperation => ({
+      ...op("doc.section.create", "DOC-incidents"),
+      payload: { deliverable },
+    });
+    const isPresent = (operation: SpecPathOperation) => presentAtHead(index, operation);
+    expect(conflictsOf([create("technical"), create("architecture")], isPresent)).toEqual([]);
+    expect(conflictsOf([create("technical"), create("technical")], isPresent)).toEqual([
+      { position: 1, reason: "duplicate" },
+    ]);
   });
 });
 

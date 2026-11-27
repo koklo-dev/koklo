@@ -7,6 +7,12 @@ import {
 import { fixturesProposalSchema, relationsProposalSchema, tableProposalSchema } from "./data.ts";
 import { criteriaProposalSchema, featureProposalSchema } from "./feature.ts";
 import { flowProposalSchema, roleProposalSchema, ruleProposalSchema } from "./others.ts";
+import {
+  environmentProposalSchema,
+  nfrProposalSchema,
+  operationProposalSchema,
+  stackProposalSchema,
+} from "./technical.ts";
 
 export { isSafeText, safeText } from "./ai-text-policy.ts";
 export {
@@ -29,6 +35,13 @@ export {
 } from "./feature.ts";
 export { jsonSchemaOf } from "./json-schema.ts";
 export { flowProposalSchema, roleProposalSchema, ruleProposalSchema } from "./others.ts";
+export {
+  environmentProposalSchema,
+  nfrProposalSchema,
+  operationProposalSchema,
+  stackProposalSchema,
+  TECHNICAL_PROPOSAL_VOCABULARY,
+} from "./technical.ts";
 
 /** Un schéma de charge par type de proposition (ordre du vocabulaire `AGENT_PROPOSAL_KINDS`). */
 export const PROPOSAL_SCHEMAS = {
@@ -44,4 +57,8 @@ export const PROPOSAL_SCHEMAS = {
   archflow: archflowProposalSchema,
   adr: adrProposalSchema,
   doc_section: docSectionProposalSchema,
+  stack: stackProposalSchema,
+  op: operationProposalSchema,
+  nfr: nfrProposalSchema,
+  env: environmentProposalSchema,
 } as const;

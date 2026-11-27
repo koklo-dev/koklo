@@ -3,6 +3,7 @@ import {
   currentArchitecture,
   currentFeatures,
   currentTableIds,
+  currentTechnical,
   type DossierClient,
   frozenPages,
   frozenVersion,
@@ -360,5 +361,65 @@ describe("currentTableIds", () => {
     expect(result).toHaveLength(250);
     expect(result[249]).toBe("T-t249");
     expect(await currentTableIds(fakeClient({}).typed, PROJECT)).toEqual([]);
+  });
+});
+
+/** TK-115 : le cahier technique actuel lu par l'agent ; ni endpoint REST, ni valeur de variable. */
+describe("currentTechnical", () => {
+  const head = {
+    repo: { id: "r-1", defaultBranch: "main" },
+    heads: { cadrage: { snapshot: { id: "s-1", status: "ready" } } },
+  };
+
+  it("choix (ouvert = sans choix), opérations du cahier seules, exigences, environnements, noms de variables", async () => {
+    const { typed } = fakeClient({
+      ...head,
+      entities: [
+        { kind: "stack", specId: "ST-sms", data: { role: "SMS", statut: "a_trancher" } },
+        { kind: "stack", specId: "ST-db", data: { role: "Base", choix: "PostgreSQL" } },
+        {
+          kind: "endpoint",
+          specId: "a.b",
+          data: { zone: "Z", composant: "C-api", resume: "Fait." },
+        },
+        { kind: "endpoint", specId: "E-x", data: { methode: "GET", chemin: "/x" } },
+        {
+          kind: "nfr",
+          specId: "NFR-001",
+          data: { titre: "Vite", categorie: "performance", cible: "p95" },
+        },
+        {
+          kind: "environments",
+          specId: "environments",
+          data: {
+            environnements: [{ id: "ENV-recette", nom: "Recette" }],
+            variables: [{ nom: "DATABASE_URL", usage: "Base", valeur: "jamais" }],
+          },
+        },
+      ],
+    });
+    const current = await currentTechnical(typed, PROJECT);
+    expect(current).toEqual({
+      stacks: [
+        { specId: "ST-sms", role: "SMS", choice: null },
+        { specId: "ST-db", role: "Base", choice: "PostgreSQL" },
+      ],
+      operations: [{ specId: "a.b", zone: "Z", component: "C-api", summary: "Fait." }],
+      requirements: [{ specId: "NFR-001", title: "Vite", category: "performance", target: "p95" }],
+      environments: [{ specId: "ENV-recette", name: "Recette" }],
+      variables: ["DATABASE_URL"],
+    });
+    expect(JSON.stringify(current)).not.toContain("jamais");
+  });
+
+  it("sans tête de spec : rien", async () => {
+    const { typed } = fakeClient({});
+    expect(await currentTechnical(typed, PROJECT)).toEqual({
+      stacks: [],
+      operations: [],
+      requirements: [],
+      environments: [],
+      variables: [],
+    });
   });
 });

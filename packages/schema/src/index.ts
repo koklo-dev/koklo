@@ -1,9 +1,12 @@
 export { CanonicalizeError, canonicalize } from "./canonical.ts";
 export { ISSUE_CODES, type IssueCode } from "./codes.ts";
 export {
+  DOC_SECTION_DELIVERABLES,
   DOC_SECTION_DIR,
+  DOC_SECTION_DIRS,
   DOC_SECTION_STATUSES,
   type DocSection,
+  type DocSectionDeliverable,
   type DocSectionStatus,
   docSectionPath,
   docSectionSlugOf,
@@ -18,6 +21,8 @@ export {
   emitArchFlowYaml,
   emitComponentYaml,
 } from "./emit/architecture-yaml.ts";
+export { EmitEnvironmentsError, emitEnvironmentsYaml } from "./emit/environments-yaml.ts";
+export { EmitError } from "./emit/errors.ts";
 export { EmitFeatureError, emitFeatureMarkdown } from "./emit/feature-markdown.ts";
 export { EmitFixtureError, emitFixtureYaml } from "./emit/fixture-yaml.ts";
 export { emitFlowMermaid } from "./emit/flow-mermaid.ts";
@@ -35,9 +40,12 @@ export {
   type IdeaSynthesisFile,
 } from "./emit/idea.ts";
 export { emitModelMermaid, type TableRelation, tableRelations } from "./emit/model-mermaid.ts";
+export { EmitNfrError, emitNfrYaml } from "./emit/nfr-yaml.ts";
+export { EmitOperationError, emitOperationYaml } from "./emit/operation-yaml.ts";
 export { EmitRolesError, emitRolesYaml } from "./emit/roles-yaml.ts";
 export { EmitRuleError, emitRuleMarkdown } from "./emit/rule-markdown.ts";
 export { emitSchemaMermaid } from "./emit/schema-mermaid.ts";
+export { EmitStackError, emitStackYaml } from "./emit/stack-yaml.ts";
 export { EmitTableError, emitTableYaml } from "./emit/table-yaml.ts";
 export * from "./entities/index.ts";
 export {
@@ -87,6 +95,7 @@ export {
   roleSideOf,
 } from "./rules/architecture-roles.ts";
 export { checkCriteriaSteps } from "./rules/rule5-criteria.ts";
+export { findSecretPaths, SECRET_REFUSAL_MESSAGE, SECRET_VALUE_CODE } from "./secrets.ts";
 export {
   adrIndex,
   archFlowIndex,
@@ -94,12 +103,14 @@ export {
   conflictsOf,
   type DocSections,
   docSectionIndex,
+  endpointIndex,
   type FlowIndex,
   featureIdOfPath,
   featureIndex,
   fixtureIndex,
   flowIndex,
   genreOf,
+  nfrIndex,
   presentAtHead,
   ruleIndex,
   type SpecConflict,
@@ -107,6 +118,7 @@ export {
   type SpecPathIndex,
   type SpecPathOperation,
   specPathIndex,
+  stackIndex,
   tableIndex,
 } from "./spec-path-index.ts";
 export type { Issue, Parsed, ParsedSpec, SpecFile, ValidationReport } from "./types.ts";

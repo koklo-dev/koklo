@@ -63,7 +63,8 @@ export function migrateSpecToV2(files: readonly SpecFile[]): MigrationResult {
   if (problem.length > 0) return refused(problem);
   const { spec } = parseSpecFiles(files);
   const tables = spec.tables.map((t) => ({ path: t.path, value: t.value as TableV1 }));
-  const endpoints = planEndpoints(spec.endpoints);
+  const operationIds = spec.operations.map(({ value }) => value.id);
+  const endpoints = planEndpoints(spec.endpoints, operationIds);
   const steps = [
     planTables(tables, spec.relations, spec.features),
     endpoints,

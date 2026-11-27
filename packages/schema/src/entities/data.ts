@@ -40,6 +40,10 @@ export const EndpointSchema = z.strictObject({
   tables: z.array(tableId).optional(),
 });
 
+/** Un fichier `api/endpoints/*` au format REST porte `methode` : toujours lu, jamais écrit (TK-115, B720). */
+export const isRestEndpoint = (value: unknown): boolean =>
+  typeof value === "object" && value !== null && "methode" in value;
+
 export type TableV1 = z.output<typeof TableSchema>;
 /** Table lue dans l'un ou l'autre format ; la v2 est définie dans `data-v2.ts`. */
 export type Table = TableV1 | TableV2;

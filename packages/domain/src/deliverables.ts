@@ -93,7 +93,7 @@ export const DELIVERABLE_ENTITY_KINDS: Readonly<Record<DeliverableKey, readonly 
   functional: ["feature", "rule", "roles", "flow"],
   data: ["table", "relations", "fixture"],
   architecture: ["component", "archflow", "adr"],
-  technical: [],
+  technical: ["stack", "endpoint", "nfr", "environments"],
   security: [],
   design: [],
   quality: [],

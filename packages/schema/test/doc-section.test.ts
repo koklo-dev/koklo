@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DOC_SECTION_DIR,
+  DOC_SECTION_DIRS,
   docSectionPath,
   docSectionSlugOf,
   emitDocSection,
@@ -20,6 +21,22 @@ describe("chemins des sections", () => {
     expect(docSectionSlugOf("architecture/overview/contexte.md")).toBeUndefined();
     expect(docSectionSlugOf("architecture/overview/x/03-a.md")).toBeUndefined();
     expect(docSectionSlugOf("data/tables/03-a.md")).toBeUndefined();
+  });
+});
+
+describe("sections du cahier technique (TK-115)", () => {
+  it("même format, dossier choisi par le livrable", () => {
+    expect(DOC_SECTION_DIRS).toEqual({
+      architecture: "architecture/overview",
+      technical: "tech/cahier-technique",
+    });
+    expect(docSectionPath(1, "objet", "technical")).toBe("tech/cahier-technique/01-objet.md");
+    expect(docSectionSlugOf("tech/cahier-technique/01-objet.md", "technical")).toEqual({
+      num: 1,
+      slug: "objet",
+    });
+    expect(docSectionSlugOf("tech/cahier-technique/01-objet.md")).toBeUndefined();
+    expect(docSectionSlugOf("architecture/overview/01-contexte.md", "technical")).toBeUndefined();
   });
 });
 

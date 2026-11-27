@@ -373,6 +373,68 @@ export async function currentArchitecture(
   };
 }
 
+/** Cahier technique actuel de la tête (TK-115) : des noms et des titres, jamais une valeur de variable. */
+export interface CurrentTechnical {
+  stacks: { specId: string; role: string; choice: string | null }[];
+  operations: { specId: string; zone: string; component: string; summary: string }[];
+  requirements: { specId: string; title: string; category: string; target: string }[];
+  environments: { specId: string; name: string }[];
+  variables: string[];
+}
+
+const TECHNICAL_MAX = 500;
+type EntityData = { specId: string; data: unknown };
+
+const stackOfRow = ({ specId, data }: EntityData) => {
+  const choice = textOf(recordOf(data).choix);
+  return { specId, role: textOf(recordOf(data).role), choice: choice === "" ? null : choice };
+};
+/** Opérations du cahier technique seules (elles nomment leur composant) : un endpoint REST n'en est pas une. */
+const operationsOf = (rows: readonly EntityData[]) =>
+  rows
+    .filter((row) => textOf(recordOf(row.data).composant) !== "")
+    .map(({ specId, data }) => ({
+      specId,
+      zone: textOf(recordOf(data).zone),
+      component: textOf(recordOf(data).composant),
+      summary: textOf(recordOf(data).resume),
+    }));
+const requirementOfRow = ({ specId, data }: EntityData) => ({
+  specId,
+  title: textOf(recordOf(data).titre),
+  category: textOf(recordOf(data).categorie),
+  target: textOf(recordOf(data).cible),
+});
+const listOfRecords = (value: unknown) => (Array.isArray(value) ? value.map(recordOf) : []);
+
+/** Choix, opérations, exigences, environnements et noms de variables de la tête de spec (index d'entités). */
+export async function currentTechnical(
+  client: DossierClient,
+  projectId: string,
+): Promise<CurrentTechnical> {
+  const snapshotId = await headSnapshotId(client, projectId);
+  const rows =
+    snapshotId === null
+      ? []
+      : await client.specEntity.findMany({
+          where: { snapshotId, kind: { in: ["stack", "endpoint", "nfr", "environments"] } },
+          orderBy: [{ kind: "asc" }, { sort: "asc" }, { id: "asc" }],
+          select: { kind: true, specId: true, data: true },
+        });
+  const of = (kind: string) => rows.filter((row) => row.kind === kind).slice(0, TECHNICAL_MAX);
+  const file = recordOf(of("environments")[0]?.data);
+  return {
+    stacks: of("stack").map(stackOfRow),
+    operations: operationsOf(of("endpoint")),
+    requirements: of("nfr").map(requirementOfRow),
+    environments: listOfRecords(file.environnements).map((entry) => ({
+      specId: textOf(entry.id),
+      name: textOf(entry.nom),
+    })),
+    variables: listOfRecords(file.variables).map((entry) => textOf(entry.nom)),
+  };
+}
+
 /**
  * Sources de la génération complète, sans diff : le dossier figé (dernière version dont le commit est réglé), la
  * synthèse publiée, la page des risques et le cahier actuel. `null` sans version figée : rien n'est envoyé au modèle.
