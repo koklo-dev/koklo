@@ -17,14 +17,14 @@
   },
   "dependencies": {
     "@koklo/config": "workspace:*",
-    "@sentry/node": "11.11.0",
+    "@sentry/node": "11.17.0",
     "pino": "10.4.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.6.6",
+    "@biomejs/biome": "2.6.9",
     "@types/node": "24.19.2",
-    "@vitest/coverage-v8": "5.1.0",
+    "@vitest/coverage-v8": "5.1.1",
     "typescript": "7.0.2",
-    "vitest": "5.1.0"
+    "vitest": "5.1.1"
   }
 }
