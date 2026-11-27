@@ -20,7 +20,14 @@ import {
  * la maquette 15. Scénario `security` : « empty » (Prêt), « demo », « revise » (À revoir), « validated » (Validé),
  * « notValidated » (vue client avant validation).
  */
-export type SecurityMode = "empty" | "demo" | "revise" | "validated" | "notValidated";
+export type SecurityMode =
+  | "empty"
+  | "demo"
+  | "revise"
+  | "validated"
+  | "notValidated"
+  /** TK-115b : données et droits écrits, aucune menace. */
+  | "noThreats";
 export type SecurityScenario = { security?: SecurityMode };
 
 type Reply = { status: number; body: string };
@@ -55,7 +62,7 @@ const isValidated = (mode: SecurityMode): boolean => mode === "validated" || sta
 
 /** Un livrable validé n'a plus rien à traiter ni à décider (B804) ; « Prêt » n'a rien. */
 function threatsOf(mode: SecurityMode): ThreatRow[] {
-  if (mode === "empty") return [];
+  if (mode === "empty" || mode === "noThreats") return [];
   if (mode !== "validated") return state.threats;
   return state.threats.map((row) =>
     row.measures.length > 0 ? row : { ...row, measures: ["Second facteur à chaque export."] },
@@ -429,9 +436,13 @@ export function handleSpecSecurity(
 export function securityDeliverable(mode: SecurityMode | undefined) {
   if (mode === undefined) return undefined;
   if (isValidated(mode)) return { status: "validated" };
-  const status = { empty: "todo", demo: "pending", revise: "revise", notValidated: "pending" }[
-    mode as Exclude<SecurityMode, "validated">
-  ];
+  const status = {
+    empty: "todo",
+    demo: "pending",
+    revise: "revise",
+    notValidated: "pending",
+    noThreats: "pending",
+  }[mode as Exclude<SecurityMode, "validated">];
   const staleSecurity = {
     changes: [{ id: "ST-sms", change: "changed" }],
     items: ["SEC-T02", "SEC-T10"],

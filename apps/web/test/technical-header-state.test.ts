@@ -51,6 +51,39 @@ describe("en-tête de la page Technique", () => {
     expect(state.validateBlocked).toBeUndefined();
   });
 
+  it("TK-115b : aucun choix de stack : « Valider » bloqué, la raison au résumé", () => {
+    const counts = { ...COUNTS, choices: 0, open: 0 };
+    const state = technicalHeaderStateOf(input({ counts }));
+    expect(state.summary).toBe(
+      "0 choix · 132 opérations · 28 exigences · 3 environnements · aucun choix de stack : ajoutez-en un avant de valider",
+    );
+    expect(state.actions).toContain("validate");
+    expect(state.validateBlocked).toBe(true);
+  });
+
+  it.each([
+    [0, 0, "aucun choix de stack : ajoutez-en un avant de valider"],
+    [24, 2, "2 choix à trancher avant de valider"],
+  ])(
+    "TK-115b : à revoir (%i choix, %i ouverts) : la raison suit la date",
+    (choices, open, reason) => {
+      const counts = { ...COUNTS, choices, open };
+      const state = technicalHeaderStateOf(
+        input({ counts, deliverable: "revise", validation: VALIDATION }),
+      );
+      expect(state.summary).toBe(`Validé le 5 nov., l'architecture a changé depuis · ${reason}`);
+      expect(state.validateBlocked).toBe(true);
+    },
+  );
+
+  it("TK-115b : comptes non lus : « Valider » bloqué, aucune raison inventée", () => {
+    const state = technicalHeaderStateOf(
+      input({ counts: undefined, deliverable: "revise", validation: VALIDATION }),
+    );
+    expect(state.summary).toBe("Validé le 5 nov., l'architecture a changé depuis");
+    expect(state.validateBlocked).toBe(true);
+  });
+
   it.each([
     ["environments", ["propose", "create-environment", "validate"]],
     ["api", ["propose", "create-operation", "validate"]],
@@ -107,7 +140,9 @@ describe("en-tête de la page Technique", () => {
     const revise = input({ deliverable: "revise", validation: VALIDATION });
     const state = technicalHeaderStateOf(revise);
     expect(state.status).toBe("revise");
-    expect(state.summary).toBe("Validé le 5 nov., l'architecture a changé depuis");
+    expect(state.summary).toBe(
+      "Validé le 5 nov., l'architecture a changé depuis · 2 choix à trancher avant de valider",
+    );
     expect(state.actions).toEqual(["create-stack", "propose-updates", "validate"]);
     expect(technicalHeaderStateOf({ ...revise, available: false }).actions).toEqual([
       "create-stack",

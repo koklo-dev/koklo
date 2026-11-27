@@ -14,8 +14,11 @@ export interface Decision {
   comment?: string;
 }
 
-/** Refus de « Valider » la Sécurité (409, B804). */
-const SECURITY_REFUSALS: Record<string, string> = {
+/** Refus motivés d'une décision (409) : cahier fonctionnel, cahier technique (B775, B851) et Sécurité (B804). */
+const REFUSALS: Record<string, string> = {
+  review_incomplete: "Il reste des éléments à traiter",
+  stack_missing: "Aucun choix de stack : ajoutez un choix technique avant de valider le cahier.",
+  choices_open: "Un choix technique reste à trancher : tranchez-le avant de valider le cahier.",
   threats_open:
     "Une menace de gravité élevée reste sans parade : décidez sa parade avant de valider.",
   data_unclassified:
@@ -24,12 +27,7 @@ const SECURITY_REFUSALS: Record<string, string> = {
 
 /** Phrase de l'échec d'une décision ; jamais le code technique ni le texte du serveur (B353). */
 export function decisionErrorText(error: unknown): string {
-  const reason = conflictReason(error);
-  if (reason === "review_incomplete") return "Il reste des éléments à traiter";
-  if (reason === "choices_open") {
-    return "Un choix technique reste à trancher : tranchez-le avant de valider le cahier.";
-  }
-  const refused = SECURITY_REFUSALS[reason ?? ""];
+  const refused = REFUSALS[conflictReason(error) ?? ""];
   if (refused) return refused;
   switch (errorCode(error)) {
     case "STALE_VERSION":

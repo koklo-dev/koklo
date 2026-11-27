@@ -4,9 +4,18 @@ type Launch = NonNullable<ProposalListOutput["launch"]>;
 type Count = { covered: number; total: number };
 type Coverage = NonNullable<LaunchReport["coverageAfter"]>;
 type RepriseSkip = NonNullable<NonNullable<Coverage["reprises"]>["skipped"]>[number];
+type DiscardReason = LaunchReport["discardReasons"][number]["reason"];
 
-/** Libellés des motifs de zone écartée (DESIGN §5.25, B619) : jamais le texte du fournisseur. */
-const DISCARD_LABELS: Record<LaunchReport["discardReasons"][number]["reason"], string> = {
+/** L'Architecture se découpe en zones ; le Technique et la Sécurité en étapes, sans couverture (B849). */
+export type ReportUnit = "zones" | "étapes";
+
+export const reportUnitOf = (tab: string): ReportUnit =>
+  tab === "architecture" ? "zones" : "étapes";
+
+const UNIT_CAPITALS: Record<ReportUnit, string> = { zones: "Zones", étapes: "Étapes" };
+
+/** Libellés des motifs de zone ou d'étape écartée (DESIGN §5.25, B619) : jamais le texte du fournisseur. */
+const DISCARD_LABELS: Record<DiscardReason, string> = {
   truncated: "réponse coupée",
   output_invalid: "réponse invalide",
   prompt_rejected: "consigne refusée",
@@ -43,10 +52,13 @@ function rolesParts(coverage: Coverage | undefined, capital = false): string[] {
   ];
 }
 
-/** « Zones traitées N/M · écartées K » puis la couverture des fonctionnalités, après ou, à défaut, avant le lancement. */
-function summaryOf(report: LaunchReport, prefix: string): string {
+/**
+ * « Zones traitées N/M · écartées K » puis, pour les zones, la couverture des fonctionnalités, après ou, à défaut, avant
+ * le lancement.
+ */
+function summaryOf(report: LaunchReport, prefix: string, unit: ReportUnit): string {
   const processed = report.zonesDone + report.zonesDiscarded;
-  const coverage = currentOf(report)?.features;
+  const coverage = unit === "zones" ? currentOf(report)?.features : undefined;
   return [
     `${prefix} ${processed}/${report.zonesRequested}`,
     `écartées ${report.zonesDiscarded}`,
@@ -55,11 +67,16 @@ function summaryOf(report: LaunchReport, prefix: string): string {
 }
 
 /** Ligne de détail du bandeau de génération (S-spec-architecture §13) ; `undefined` sans bilan. */
-export function launchDetailOf(launch: Launch | null | undefined): string | undefined {
+export function launchDetailOf(
+  launch: Launch | null | undefined,
+  unit: ReportUnit = "zones",
+): string | undefined {
   const report = launch?.report;
   if (!report) return undefined;
-  if (report.zonesRequested === 0) return "Préparation des zones";
-  return [summaryOf(report, "Zones traitées"), ...rolesParts(currentOf(report))].join(" · ");
+  if (report.zonesRequested === 0) return `Préparation des ${unit}`;
+  const summary = summaryOf(report, `${UNIT_CAPITALS[unit]} traitées`, unit);
+  const roles = unit === "zones" ? rolesParts(currentOf(report)) : [];
+  return [summary, ...roles].join(" · ");
 }
 
 /** Motif d'arrêt affiché : celui du bilan, sinon déduit du statut (échec sans motif : interrompu). */
@@ -122,13 +139,21 @@ function rolesLine(report: LaunchReport): string[] {
   ];
 }
 
-function discardLine(report: LaunchReport): string[] {
-  if (report.discardReasons.length === 0) return [];
-  const parts = report.discardReasons.map(
-    ({ reason, count }) => `${DISCARD_LABELS[reason]} (${count})`,
+/** Étapes écartées nommées avec leur motif ; zones, et lancements sans noms : les comptes par motif. */
+function discardLine(report: LaunchReport, unit: ReportUnit): string[] {
+  const named = (unit === "étapes" ? (report.discardedSteps ?? []) : []).map(
+    ({ step, reason }) => `${step} (${DISCARD_LABELS[reason]})`,
   );
-  return [`Zones écartées : ${parts.join(", ")}`];
+  const parts =
+    named.length > 0
+      ? named
+      : report.discardReasons.map(({ reason, count }) => `${DISCARD_LABELS[reason]} (${count})`);
+  return parts.length > 0 ? [`${UNIT_CAPITALS[unit]} écartées : ${parts.join(", ")}`] : [];
 }
+
+/** Lignes entre le bilan et les éléments écartés : couverture et rôles pour les zones seulement. */
+const middleLines = (report: LaunchReport, unit: ReportUnit): string[] =>
+  unit === "zones" ? [...coverageLine(report), ...rolesLine(report)] : sectionsPart(report, true);
 
 export interface LaunchReportView {
   variant: "neutral" | "warning";
@@ -137,7 +162,10 @@ export interface LaunchReportView {
 }
 
 /** Bilan de la Relecture (DESIGN §5.25) : lancement fini seulement ; neutre si terminé, avertissement sinon. */
-export function launchReportOf(launch: Launch | null | undefined): LaunchReportView | null {
+export function launchReportOf(
+  launch: Launch | null | undefined,
+  unit: ReportUnit = "zones",
+): LaunchReportView | null {
   const report = launch?.report;
   if (!launch || !report || ACTIVE.has(launch.status) || isEmpty(report)) return null;
   const stop = stopLabelOf(launch, report);
@@ -146,10 +174,19 @@ export function launchReportOf(launch: Launch | null | undefined): LaunchReportV
     variant: done ? "neutral" : "warning",
     icon: done ? "info" : "warning",
     lines: [
-      `${summaryOf(report, "Bilan du lancement · zones traitées")} · ${stop}`,
-      ...coverageLine(report),
-      ...rolesLine(report),
-      ...discardLine(report),
+      `${summaryOf(report, `Bilan du lancement · ${unit} traitées`, unit)} · ${stop}`,
+      ...middleLines(report, unit),
+      ...discardLine(report, unit),
     ],
   };
+}
+
+/**
+ * Bilan quand plus rien n'est à relire (Technique et Sécurité, B850) : seulement si une étape est écartée ou si le
+ * lancement ne s'est pas terminé.
+ */
+export function emptyReportOf(launch: Launch | null | undefined): LaunchReportView | null {
+  const view = launchReportOf(launch, "étapes");
+  const discarded = launch?.report?.zonesDiscarded ?? 0;
+  return view && (discarded > 0 || view.variant === "warning") ? view : null;
 }

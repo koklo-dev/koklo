@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { STEP_REPORT, STEPS_LINE, SUMMARY_LINE, serveLaunch } from "./support/launch.ts";
 import { renderSecurity, serveSecurity } from "./support/security.tsx";
 import { polyfillRadix, procedures, resetWebMocks, watchUrl } from "./support/web-mocks.ts";
 
@@ -111,5 +112,47 @@ describe("onglet Menaces", () => {
     renderSecurity({ search: "q=rien" });
     expect(await screen.findByText("Aucune menace ne correspond")).toBeVisible();
     expect(screen.getByRole("button", { name: "Effacer la recherche" })).toBeVisible();
+  });
+});
+
+const NO_THREAT = "Aucune menace pour l'instant";
+
+describe("TK-115b : « Menaces » vide et étapes écartées", () => {
+  const serve = (role: "owner" | "designer", report: Record<string, unknown> = STEP_REPORT) => {
+    serveSecurity(role, { threats: [] });
+    serveLaunch(report);
+  };
+
+  it("le bilan en note au-dessus de l'état vide", async () => {
+    serve("owner");
+    renderSecurity();
+    const note = (await screen.findByText(SUMMARY_LINE)).closest('[role="note"]');
+    expect(note).toHaveTextContent(STEPS_LINE);
+    const empty = await screen.findByText(NO_THREAT);
+    expect(
+      (note as Node).compareDocumentPosition(empty) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("pas de bilan sans étape écartée, ni pour le designer", async () => {
+    serve("owner", { ...STEP_REPORT, zonesDiscarded: 0, discardReasons: [] });
+    const first = renderSecurity();
+    expect(await screen.findByText(NO_THREAT)).toBeVisible();
+    await waitFor(() => expect(procedures.proposalList.mock.results.length).toBeGreaterThan(0));
+    expect(screen.queryByText(/Bilan du lancement/)).toBeNull();
+    first.unmount();
+    resetWebMocks();
+    serve("designer");
+    renderSecurity();
+    expect(await screen.findByText(NO_THREAT)).toBeVisible();
+    expect(screen.queryByText(/Bilan du lancement/)).toBeNull();
+  });
+
+  it("pas de bilan sur un filtre sans résultat", async () => {
+    serve("owner");
+    renderSecurity({ search: "q=rien" });
+    expect(await screen.findByText("Aucune menace ne correspond")).toBeVisible();
+    await waitFor(() => expect(procedures.proposalList.mock.results.length).toBeGreaterThan(0));
+    expect(screen.queryByText(/Bilan du lancement/)).toBeNull();
   });
 });

@@ -18,6 +18,14 @@ describe("decisionErrorText", () => {
       "Des données restent à classer : décidez leur catégorie et leur conservation avant de valider.",
     ],
     [
+      apiError("CONFLICT", { reason: "stack_missing" }),
+      "Aucun choix de stack : ajoutez un choix technique avant de valider le cahier.",
+    ],
+    [
+      apiError("CONFLICT", { reason: "choices_open" }),
+      "Un choix technique reste à trancher : tranchez-le avant de valider le cahier.",
+    ],
+    [
       apiError("STALE_VERSION"),
       "Le cahier a changé depuis votre lecture. Rechargez la page pour relire la version à jour.",
     ],

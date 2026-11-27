@@ -27,7 +27,7 @@ export interface TechnicalHeaderState {
   statusIcon?: IconName;
   summary?: string;
   actions: TechnicalHeaderAction[];
-  /** « Valider » désactivé : un choix reste à trancher, ou les comptes ne sont pas encore lus. */
+  /** « Valider » désactivé : aucun choix de stack, un choix à trancher, ou des comptes pas encore lus (B851). */
   validateBlocked?: true;
   /** Cahier validé : l'ajout devient le bouton principal. */
   createPrimary?: true;
@@ -57,18 +57,25 @@ export interface TechnicalHeaderInput {
 const plural = (count: number, one: string, other: string): string =>
   `${count} ${count === 1 ? one : other}`;
 
-/** « … · 2 choix à trancher avant de valider » (maquette 14 l.776). */
-function openSummary(counts: NonNullable<TechnicalHeaderInput["counts"]>): string {
-  const open = counts.open ? ` · ${counts.open} choix à trancher avant de valider` : "";
-  return `${countsText(counts)}${open}`;
+/** Ce qui empêche de valider : aucun choix de stack (B851), ou des choix à trancher (maquette 14 l.776). */
+function blockerOf(counts: NonNullable<TechnicalHeaderInput["counts"]>): string | undefined {
+  if (counts.choices === 0) return "aucun choix de stack : ajoutez-en un avant de valider";
+  return counts.open ? `${counts.open} choix à trancher avant de valider` : undefined;
+}
+
+/** « <résumé> · <raison> » : la raison suit les comptes, ou la date d'un cahier à revoir. */
+function withBlocker(summary: string, counts: TechnicalHeaderInput["counts"]): string {
+  const blocker = counts ? blockerOf(counts) : undefined;
+  return blocker ? `${summary} · ${blocker}` : summary;
 }
 
 function listSummary({ deliverable, validation, counts }: TechnicalHeaderInput) {
   if (deliverable === "validated" && validation) return architectureValidationSummary(validation);
   if (deliverable === "revise" && validation) {
-    return `Validé le ${shortDate(validation.at)}, l'architecture a changé depuis`;
+    const since = `Validé le ${shortDate(validation.at)}, l'architecture a changé depuis`;
+    return withBlocker(since, counts);
   }
-  return counts ? openSummary(counts) : undefined;
+  return counts ? withBlocker(countsText(counts), counts) : undefined;
 }
 
 /** Ajout de l'onglet ; aucun sur Document, la Relecture ajoute un choix. */
@@ -91,7 +98,7 @@ function listActions(input: TechnicalHeaderInput): TechnicalHeaderAction[] {
 /** « Valider » après les autres boutons, tant que le cahier est à valider ou à revoir (B775). */
 function validationOf({ deliverable, counts }: TechnicalHeaderInput) {
   if (deliverable !== "pending" && deliverable !== "revise") return undefined;
-  const blocked = counts === undefined || Boolean(counts.open);
+  const blocked = counts === undefined || blockerOf(counts) !== undefined;
   return blocked ? { validateBlocked: true as const } : {};
 }
 

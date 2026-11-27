@@ -2,6 +2,7 @@
 
 import { Button, Icon, type IconName, InlineAlert, Skeleton } from "@koklo/ui";
 import { type ReactNode, useId } from "react";
+import { launchDetailOf } from "../lib/launch-report.ts";
 import type { SecurityHeaderAction } from "../lib/security-header-state.ts";
 import { SECURITY_ERROR_TITLE, updateInstruction } from "../lib/security-labels.ts";
 import { securityFormOf, securityTargetOf, withSecurityUrl } from "../lib/security-tab.ts";
@@ -11,6 +12,7 @@ import { useInPlaceToast } from "../lib/use-security-writes.ts";
 import { SpecBody } from "./features-body.tsx";
 import { ProposeEntry } from "./features-header-action.tsx";
 import { StatusBlock } from "./features-status-block.tsx";
+import { SettledLaunchReport } from "./launch-report-note.tsx";
 import { SecurityClientView } from "./security-client-view.tsx";
 import { SecurityDataTab } from "./security-data-tab.tsx";
 import { SecurityDocumentTab } from "./security-document-tab.tsx";
@@ -141,6 +143,7 @@ function Empty({ page }: { page: SecurityPageModel }) {
       <SecurityReady
         agent={<ProposeEntry propose={page.propose} onReview={page.url.openReview} />}
         onCreate={() => createThreat(page)}
+        notice={<SettledLaunchReport propose={page.propose} />}
       />
     );
   }
@@ -221,7 +224,10 @@ function ListBody({ page }: { page: SecurityPageModel }) {
 
 /** Relecture ouverte : génération, onglet Relecture, ou les onglets de lecture sous leur bandeau. */
 function ReviewBody({ page }: { page: SecurityPageModel }) {
-  if (page.generating) return <SecurityGenerating onLeave={page.url.closeReview} />;
+  if (page.generating) {
+    const detail = launchDetailOf(page.propose.status.launch, "étapes");
+    return <SecurityGenerating onLeave={page.url.closeReview} detail={detail} />;
+  }
   if (page.url.tab === "review") return <SecurityReviewView page={page} />;
   return (
     <>

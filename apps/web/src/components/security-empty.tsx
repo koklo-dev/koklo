@@ -12,9 +12,19 @@ import {
 import { ErrorNotice } from "./error-notice.tsx";
 
 /** Prêt (design S-spec-security §4) : l'agent peut proposer le modèle de menaces, ou l'équipe l'écrit à la main. */
-export function SecurityReady({ agent, onCreate }: { agent: ReactElement; onCreate: () => void }) {
+export function SecurityReady({
+  agent,
+  onCreate,
+  notice,
+}: {
+  agent: ReactElement;
+  onCreate: () => void;
+  /** Bilan du dernier lancement, au-dessus de l'état (B850). */
+  notice: ReactNode;
+}) {
   return (
     <div className="mx-auto mt-8 flex w-full max-w-[580px] flex-col gap-3 px-4 pb-8">
+      {notice}
       <EmptyState
         icon="shield"
         title={READY_TITLE}

@@ -14,10 +14,18 @@ const FRAMES = [
 ];
 
 /** Génération de la sécurité (design S-spec-security §4) : bandeau d'état « Annuler l'attente » et squelette. */
-export function SecurityGenerating({ onLeave }: { onLeave: () => void }) {
+export function SecurityGenerating({
+  onLeave,
+  detail,
+}: {
+  onLeave: () => void;
+  /** « Étapes traitées 4/9 · écartées 1 » (DESIGN §5.25). */
+  detail?: string | undefined;
+}) {
   return (
     <DataGenerating
       onLeave={onLeave}
+      detail={detail}
       text={SECURITY_GENERATING}
       heightClass="h-[440px]"
       frames={FRAMES}
