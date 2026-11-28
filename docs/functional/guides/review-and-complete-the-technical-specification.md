@@ -28,7 +28,7 @@ covers_commit: c2322e2c
 
    ![Étapes écartées et Stack sans choix, thème clair](../../../design/screens/captures/S-spec-technical/no-stack-light.png)
 
-5. Onglet **Stack** : ouvrez un choix **À trancher**, comparez les **Options comparées**, puis cliquez **Choisir** suivi du nom de l'option. Le choix est enregistré aussitôt (« Choix enregistré »).
+5. Onglet **Stack** : ouvrez un choix **À trancher**, comparez les **Options comparées**, puis cliquez **Choisir** suivi du nom de l'option. Le choix est enregistré aussitôt (« Choix enregistré »). Pendant que la liste rattrape l'écriture (« la liste n'est pas encore à jour »), les boutons **Choisir** sont indisponibles quelques instants.
 
    ![Choix à trancher et sa fiche, thème clair](../../../design/screens/captures/S-spec-technical/list-stack-fiche-light.png)
 
@@ -72,6 +72,7 @@ Les éléments acceptés apparaissent dans leur onglet et le résumé de l'en-t�
 | Une valeur de secret ne peut pas entrer dans la spec : gardez seulement le nom de la variable. | Un texte contient une clé, un mot de passe ou un jeton | Retirez la valeur. Le contrôle ne reconnaît pas tout : relisez vous-même avant d'enregistrer |
 | Le technique s'ouvre quand l'architecture est validée : validez-la, ou ouvrez le livrable. | L'architecture n'est pas validée | Validez l'architecture, ou demandez à un propriétaire ou un administrateur d'ouvrir le livrable |
 | L'architecture est vide : enregistrez au moins un composant avant de proposer le cahier technique. | Aucun composant enregistré | Complétez l'architecture |
+| La spec a changé depuis l'affichage de cette page | La spec a reçu une autre écriture depuis que vous l'avez ouverte | Rien n'a été écrit. Cliquez **Recharger**, puis recommencez votre action |
 | Revalidez l'architecture pour relancer l'agent. | L'architecture a changé et n'est pas revalidée | Revalidez-la |
 | Un choix technique reste à trancher : tranchez-le avant de valider le cahier. | Un choix est resté ouvert | Onglet **Stack** : tranchez-le, puis **Valider** |
 | Aucun choix de stack : ajoutez un choix technique avant de valider le cahier. | Le cahier n'a aucun choix de stack | Onglet **Stack** : **Nouveau choix**, ou relancez l'agent et enregistrez ses choix |
