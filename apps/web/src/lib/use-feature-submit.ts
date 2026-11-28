@@ -41,6 +41,8 @@ export interface WriteMeta {
   target: string;
   /** Écriture faite sur place (niveau ASVS, résumé) : ni fiche à ouvrir, ni avis, ni déplacement du focus. */
   inPlace?: boolean;
+  /** Action sur place sans formulaire (« Choisir », « Marquer comme validée ») : aucun brouillon à rouvrir. */
+  direct?: boolean;
 }
 export type WritePhase = "idle" | "sending" | "tracking" | "indexing" | "late" | "failed" | "saved";
 export interface SavedInfo {
@@ -333,7 +335,10 @@ export function useFeatureWrite({ projectId, filters }: WriteOptions) {
   useIndexFollowUp(core, setState, state, filters);
   return {
     ...state,
+    projectId,
     busy: ACTIVE.includes(state.phase),
+    /** L'index n'a pas rattrapé la dernière écriture : une action sur place partirait d'une version périmée. */
+    behind: state.phase === "late",
     submit: useSubmit(core, outcomes, exit),
     resume: useResume(core),
     /** Clé d'idempotence de l'envoi en cours ou réutilisable, gardée avec le brouillon. */

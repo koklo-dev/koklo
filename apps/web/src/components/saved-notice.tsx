@@ -2,8 +2,11 @@
 
 import type { Role } from "@koklo/contract";
 import { Alert, Button, Icon } from "@koklo/ui";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { describeSaveError } from "../lib/feature-errors.ts";
+import { LATE_POLL_MS } from "../lib/feature-tracking.ts";
 import { confirmationText, PLACEMENT_TEXT } from "../lib/features-region.ts";
+import { orpc } from "../lib/orpc.ts";
 import { canReadRepos } from "../lib/roles.ts";
 import type { FeatureWrite } from "../lib/use-feature-submit.ts";
 import { SaveErrorAlert } from "./feature-form-errors.tsx";
@@ -94,10 +97,69 @@ export function WriteFailure({
     role,
     mode: write.meta?.kind ?? "update",
   });
+  const outdated = view.kind === "stale-base" || view.kind === "write-conflict";
+  const direct = Boolean(write.meta?.direct || write.meta?.inPlace);
   return (
-    <SaveErrorAlert view={view} handlers={{}} criteriaCount={0}>
-      <Button type="button" variant="outline" className="h-11 md:h-9" onClick={onReopen}>
-        Rouvrir le brouillon
+    <>
+      {outdated ? <HeadRefresh projectId={write.projectId} /> : null}
+      {direct ? (
+        <DirectFailure view={view} outdated={outdated} onDismiss={write.dismiss} />
+      ) : (
+        <SaveErrorAlert view={view} handlers={{}} criteriaCount={0}>
+          <Button type="button" variant="outline" className="h-11 md:h-9" onClick={onReopen}>
+            Rouvrir le brouillon
+          </Button>
+        </SaveErrorAlert>
+      )}
+    </>
+  );
+}
+
+/**
+ * Écriture refusée parce que la spec a avancé (TK-115c) : tant que l'avis est affiché, `spec.head` est relu. Les listes
+ * suivent la nouvelle version, et l'envoi suivant part avec elle.
+ */
+function HeadRefresh({ projectId }: { projectId: string }) {
+  useQuery({
+    ...orpc.spec.head.queryOptions({ input: { projectId } }),
+    refetchInterval: LATE_POLL_MS,
+  });
+  return null;
+}
+
+const OUTDATED_DIRECT = {
+  title: "La spec a changé depuis l'affichage de cette page",
+  text: "Rien n'a été écrit. La version actuelle est relue : recommencez votre action.",
+};
+
+/** Échec d'une action sur place : aucun brouillon ; « Recharger » relit la spec, sinon « Fermer ». */
+function DirectFailure({
+  view,
+  outdated,
+  onDismiss,
+}: {
+  view: ReturnType<typeof describeSaveError>;
+  outdated: boolean;
+  onDismiss: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const reload = (): void => {
+    void queryClient.invalidateQueries({ queryKey: orpc.spec.key() });
+    onDismiss();
+  };
+  return (
+    <SaveErrorAlert
+      view={outdated ? { ...view, ...OUTDATED_DIRECT } : view}
+      handlers={{}}
+      criteriaCount={0}
+    >
+      <Button
+        type="button"
+        variant="outline"
+        className="h-11 md:h-9"
+        onClick={outdated ? reload : onDismiss}
+      >
+        {outdated ? "Recharger" : "Fermer"}
       </Button>
     </SaveErrorAlert>
   );

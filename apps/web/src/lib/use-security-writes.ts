@@ -24,7 +24,7 @@ interface InPlace {
 /** Écriture sur place (un lot d'une opération, B807) : suivie comme tout enregistrement, le focus ne bouge pas. */
 function useInPlaceWrite({ projectId, head, write }: SecurityPageModel) {
   return ({ target, title, snapshot, send }: InPlace): void => {
-    if (!head || write.busy) return;
+    if (!head || write.busy || write.behind) return;
     const base = { projectId, branch: head.branch, baseSha: head.commitSha };
     write.submit({
       send: (idempotencyKey) => send({ ...base, idempotencyKey }),

@@ -9,6 +9,7 @@ import { pollDelay, TRACKING_LIMIT_MS } from "./feature-tracking.ts";
 import { orpc } from "./orpc.ts";
 import { type BatchPlan, isSavable, planBatches } from "./proposal-operations.ts";
 import type { ProposalOutput } from "./proposal-types.ts";
+import { followIndex } from "./use-index-wait.ts";
 
 const TERMINAL = ["committed", "failed", "conflict"];
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -112,6 +113,8 @@ export function useProposalSave(options: { projectId: string; branch: string | u
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState<ProposalSaveProgress | undefined>(undefined);
   const busy = useRef(false);
+  /** Dernière version écrite : suivie jusqu'à l'index, sinon l'écran garderait celle d'avant (TK-115c). */
+  const written = useRef<string | null>(null);
 
   const runPlan = useCallback(
     async (plan: BatchPlan): Promise<PlanOutcome> => {
@@ -119,6 +122,7 @@ export function useProposalSave(options: { projectId: string; branch: string | u
         const batch = await submit.mutateAsync(submitInput(projectId, branch, plan));
         const done = await follow(projectId, batch);
         const code = done.status === "committed" ? null : (done.errorCode ?? done.status);
+        if (!code && done.commitSha) written.current = done.commitSha;
         return { code, skipped: batch.skipped ?? [] };
       } catch (error) {
         const skipped = allSkipped(error);
@@ -144,15 +148,17 @@ export function useProposalSave(options: { projectId: string; branch: string | u
       if (plans.length === 0) return null;
       busy.current = true;
       setSaving(true);
+      written.current = null;
       const result = await runPlans(plans, runPlan, setProgress);
       await queryClient.invalidateQueries({ queryKey: orpc.proposal.key() });
       await queryClient.invalidateQueries({ queryKey: orpc.spec.key() });
+      if (written.current) followIndex(queryClient, projectId, written.current);
       busy.current = false;
       setSaving(false);
       setProgress(undefined);
       return result;
     },
-    [queryClient, runPlan],
+    [projectId, queryClient, runPlan],
   );
   return { saving, progress, save };
 }
