@@ -58,7 +58,7 @@ function Proposal({
       label="summary"
       title={`Proposition de l'agent · ${proposal.rationale}`}
       rationale=""
-      busy={page.write.busy || agent.rejecting}
+      busy={page.write.busy || page.write.behind || agent.rejecting}
       onAccept={() => accept(proposal.id)}
       onIgnore={() => agent.reject(proposal.id)}
     >

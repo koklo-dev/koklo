@@ -280,7 +280,7 @@ function Detail({ page, choice }: { page: TechnicalPageModel; choice: StackSumma
       choice={choice}
       onEdit={form.canWrite ? () => form.openEdit(choice.specId) : undefined}
       onChoose={form.canWrite ? (option) => choose(choice.specId, option) : undefined}
-      choosing={write.busy}
+      choosing={write.busy || write.behind}
     />
   );
 }

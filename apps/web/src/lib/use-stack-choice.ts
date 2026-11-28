@@ -35,6 +35,7 @@ export function useStackChoice(
         status: "",
         priority: "",
         target: id,
+        direct: true,
       },
     });
   };

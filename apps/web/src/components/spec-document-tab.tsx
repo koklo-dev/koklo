@@ -241,7 +241,7 @@ function MarkValidated({
       variant="ghost"
       size="sm"
       className="underline max-md:h-11"
-      disabled={write.busy}
+      disabled={write.busy || write.behind}
       onClick={() =>
         write.submit({
           build: (idempotencyKey) =>
@@ -263,6 +263,7 @@ function MarkValidated({
             status: "",
             priority: "",
             target: section.specId,
+            direct: true,
           },
         })
       }

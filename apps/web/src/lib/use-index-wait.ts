@@ -3,6 +3,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { INDEX_POLL_MS, LATE_LIMIT_MS } from "./feature-tracking.ts";
 import { orpc } from "./orpc.ts";
 
 interface Head {
@@ -78,6 +79,25 @@ export function useIndexWait(options: IndexWaitOptions): void {
       () => latest.current,
     );
   }, [active, commitSha, projectId, pollMs, limitMs, queryClient]);
+}
+
+/**
+ * Après un enregistrement sans formulaire suivi (Relecture, TK-115c) : relit `spec.head` jusqu'à la version écrite,
+ * 2 minutes au plus, puis relit la spec. Indépendant de l'écran, qui peut se fermer avant la fin de l'indexation.
+ */
+export function followIndex(queryClient: QueryClient, projectId: string, commitSha: string): void {
+  createIndexPoller(
+    () => queryClient.fetchQuery(orpc.spec.head.queryOptions({ input: { projectId } })),
+    commitSha,
+    () => ({
+      projectId,
+      active: true,
+      commitSha,
+      pollMs: INDEX_POLL_MS,
+      limitMs: LATE_LIMIT_MS,
+      onCaughtUp: () => void queryClient.invalidateQueries({ queryKey: orpc.spec.key() }),
+    }),
+  );
 }
 
 /** Où la ligne enregistrée apparaît après la relecture de la liste. */
